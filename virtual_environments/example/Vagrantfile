@@ -1,0 +1,54 @@
+# -*- mode: ruby -*-
+# vim: set ft=ruby :
+
+# Vagrantfile API/syntax version. Don't touch unless you know what you're doing!
+VAGRANTFILE_API_VERSION = "2"
+
+#Requires hostmanager plugin
+#vagrant plugin install vagrant-hostmanager
+
+domain = 'ljames.org'
+def_network = '172.31.0'
+def_ram = '512'
+
+os_ubuntu14 = "bento/ubuntu-14.04"
+os_centos5 = "bento/centos-5.11"
+os_centos6 = "bento/centos-6.7"
+os_centos7 = "bento/centos-7.1"
+
+#nodes = [
+#  { :hostname => 'master',  :ip => def_network+'.11', :box => os_centos},
+#  { :hostname => 'minion1', :ip => def_network+'.21', :box => os_centos},
+#  { :hostname => 'minion2', :ip => def_network+'.22', :box => os_centos},
+#  { :hostname => 'icinga',  :ip => def_network+'.30', :box => os_centos, :forward_port => [{ :remote_port => '80', :local_port => '3080'}]},
+#]
+
+nodes = [
+  { :hostname => 'puppet-master',  :ip => def_network+'.10', :box => os_centos6},
+  { :hostname => 'foreman',        :ip => def_network+'.11', :box => os_centos6},
+  { :hostname => 'client1',        :ip => def_network+'.22', :box => os_centos5},
+]
+
+Vagrant.configure(VAGRANTFILE_API_VERSION) do |config|
+  config.hostmanager.enabled = true
+  config.hostmanager.manage_host = true
+  config.hostmanager.ignore_private_ip = false
+  config.hostmanager.include_offline = true
+
+  nodes.each do |node|
+    config.vm.define node[:hostname] do |node_config|
+      config.vm.provider 'virtualbox' do |vb|
+        vb.name = node[:hostname]
+        vb.memory = node[:ram] ? node[:ram] : def_ram;
+      end
+      node_config.vm.box = node[:box]
+      node_config.vm.hostname = node[:hostname] + '.' + domain
+      node_config.vm.network 'private_network', ip: node[:ip], virtualbox__intnet: 'salt'
+      node[:forward_port].to_a.each do |fp|
+        node_config.vm.network 'forwarded_port', guest: fp[:remote_port], host: fp[:local_port], protocol: 'tcp'
+      end
+#      node_config.vm.synced_folder ".", "/vagrant", disabled: true
+#      node_config.vm.synced_folder '..', '/srv/se-book'
+    end
+  end
+end
